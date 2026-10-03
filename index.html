@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tangent: random finds near your field</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --panel:#E7EAEF; --surface:#F8F9FB; --ink:#141A2E; --muted:#596277; --line:#C8CDD7;
+  --signal:#0220E8; --signal-ink:#FFFFFF; --amber:#E08E00;
+  --knurl-a:#BFC5D0; --knurl-b:#D9DDE4; --cap:#DFE3E9; --cap-hi:#FDFDFE;
+  --sans:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --serif:"Source Serif 4", Georgia, "Times New Roman", serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --panel:#11141B; --surface:#1A1E28; --ink:#E6E9F2; --muted:#9AA3B7; --line:#2F3545;
+    --signal:#7088FF; --signal-ink:#0A0E1E; --amber:#FFB52E;
+    --knurl-a:#262B37; --knurl-b:#343A49; --cap:#2B3140; --cap-hi:#4A5269;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--panel);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.45}
+a{color:var(--signal)}
+:focus-visible{outline:3px solid var(--signal);outline-offset:2px}
+
+.wrap{max-width:1120px;margin:0 auto;padding:28px 18px 56px}
+header{margin-bottom:26px}
+h1{font-weight:800;font-stretch:125%;font-size:clamp(2.6rem,9vw,4.4rem);line-height:.95;letter-spacing:-.02em;margin:0}
+.lede{margin:.6rem 0 0;max-width:34rem;color:var(--muted);font-size:1.05rem}
+
+.layout{display:grid;gap:22px}
+@media (min-width:900px){.layout{grid-template-columns:360px 1fr;align-items:start}.controls{position:sticky;top:18px}}
+
+.controls{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px}
+.field + .field{margin-top:22px}
+.lbl{display:block;font-weight:700;font-size:.95rem;margin-bottom:.45rem}
+.hint{color:var(--muted);font-size:.88rem;margin:.4rem 0 0}
+input[type=text],input[type=email],input[type=password]{width:100%;font:inherit;font-size:1.05rem;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:.7rem .8rem}
+input::placeholder{color:var(--muted)}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:.88rem;color:var(--ink);background:transparent;border:1px solid var(--line);border-radius:999px;padding:.32rem .75rem;cursor:pointer;text-align:left}
+.chip[aria-pressed=true]{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+.chip:hover{border-color:var(--signal)}
+
+.dial{position:relative;width:280px;height:200px;margin:4px auto 0;user-select:none;-webkit-user-select:none}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.dial .arc{fill:none;stroke:var(--line);stroke-width:2}
+.dial .tick{stroke:var(--muted);stroke-width:2;stroke-linecap:round}
+.dial .tick.on{stroke:var(--amber);stroke-width:4}
+.stop{position:absolute;transform:translate(-50%,-50%);font:inherit;font-size:.9rem;font-weight:600;color:var(--muted);background:none;border:0;padding:.3rem .4rem;border-radius:6px;cursor:pointer;white-space:nowrap}
+.stop[aria-checked=true]{color:var(--ink)}
+.knob{position:absolute;left:140px;top:104px;width:96px;height:96px;margin:-48px 0 0 -48px;border-radius:50%;cursor:grab;touch-action:none;
+  background:repeating-conic-gradient(var(--knurl-a) 0 4deg,var(--knurl-b) 4deg 8deg);
+  box-shadow:0 2px 0 var(--line),0 8px 18px rgba(20,26,46,.18)}
+.knob:active{cursor:grabbing}
+.cap{position:absolute;inset:9px;border-radius:50%;background:radial-gradient(circle at 35% 28%,var(--cap-hi),var(--cap) 70%);transition:transform .2s cubic-bezier(.3,1.5,.5,1)}
+.cap::after{content:"";position:absolute;left:50%;top:7px;width:4px;height:24px;margin-left:-2px;border-radius:2px;background:var(--amber)}
+.drift-desc{text-align:center;color:var(--muted);font-size:.92rem;margin:.2rem auto 0;max-width:19rem;min-height:2.7em}
+
+fieldset{border:0;margin:0;padding:0}
+.src{display:flex;gap:.6rem;align-items:baseline;padding:.32rem 0;cursor:pointer}
+.src input{accent-color:var(--signal);width:1.05rem;height:1.05rem;transform:translateY(2px)}
+.src small{color:var(--muted);font-size:.85rem}
+
+.draw{display:block;width:100%;margin-top:22px;font:inherit;font-weight:700;font-stretch:112%;font-size:1.1rem;color:var(--signal-ink);background:var(--signal);border:0;border-radius:12px;padding:.95rem 1rem;cursor:pointer}
+.draw:disabled{opacity:.6;cursor:progress}
+.status{min-height:1.4em;margin:.6rem 0 0;color:var(--muted);font-size:.9rem;text-align:center}
+
+details{margin-top:18px;border-top:1px solid var(--line);padding-top:12px}
+summary{cursor:pointer;font-weight:600;font-size:.92rem;color:var(--muted)}
+details .field{margin-top:14px}
+
+.result{min-height:200px}
+.empty{padding:8px 4px}
+.empty h2{font-stretch:112%;font-size:1.4rem;margin:0 0 .4rem}
+.empty p{color:var(--muted);margin:0 0 1rem;max-width:32rem}
+
+.path{list-style:none;margin:0 0 18px;padding:0;display:flex;flex-wrap:wrap;gap:0}
+.path li{position:relative;padding:.1rem 1.6rem .1rem 0;max-width:100%}
+.path li:not(:last-child)::after{content:"";position:absolute;right:.55rem;top:1.15rem;width:.55rem;height:.55rem;border-top:2px solid var(--line);border-right:2px solid var(--line);transform:rotate(45deg)}
+.path .k{display:block;font-size:.8rem;color:var(--muted)}
+.path .v{font-weight:600;font-size:.95rem}
+.path .s{display:block;font-size:.8rem;color:var(--muted)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--signal);border-radius:6px 16px 16px 6px;padding:22px 22px 20px}
+.kind{font-size:.88rem;font-weight:600;color:var(--muted);margin:0 0 .5rem}
+.card h2{font-family:var(--serif);font-weight:600;font-size:clamp(1.35rem,3.4vw,1.85rem);line-height:1.2;margin:0}
+.card h2 a{color:var(--ink);text-decoration:none}
+.card h2 a:hover{text-decoration:underline;text-decoration-color:var(--signal)}
+.meta{display:flex;flex-wrap:wrap;gap:.25rem 1rem;margin:.7rem 0 0;color:var(--muted);font-size:.9rem}
+.snippet{font-family:var(--serif);font-size:1.05rem;line-height:1.6;margin:1rem 0 0;max-width:68ch}
+.actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.btn{font:inherit;font-weight:600;font-size:.95rem;border-radius:10px;padding:.6rem 1rem;cursor:pointer;text-decoration:none;border:1px solid var(--line);color:var(--ink);background:transparent}
+.btn.primary{background:var(--signal);border-color:var(--signal);color:var(--signal-ink)}
+
+.errors{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.errors h2{font-size:1.1rem;margin:0 0 .4rem}
+.errors ul{margin:.4rem 0 0;padding-left:1.1rem;color:var(--muted);font-size:.92rem}
+
+.history{margin-top:34px}
+.history-head{display:flex;justify-content:space-between;align-items:baseline;gap:1rem}
+.history h3{font-stretch:112%;font-size:1.05rem;margin:0}
+.history ol{list-style:none;margin:.6rem 0 0;padding:0;border-top:1px solid var(--line)}
+.history li{padding:.6rem 0;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:.2rem 1rem;align-items:baseline}
+.history li a{color:var(--ink);font-family:var(--serif);text-decoration:none;overflow-wrap:anywhere}
+.history li a:hover{text-decoration:underline}
+.history li span{color:var(--muted);font-size:.82rem;white-space:nowrap}
+.linkbtn{font:inherit;font-size:.88rem;color:var(--muted);background:none;border:0;cursor:pointer;text-decoration:underline;padding:0}
+
+@media (prefers-reduced-motion: reduce){.cap{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Tangent</h1>
+    <p class="lede">A random find from near your field. Name a topic, set how far to drift, and draw a paper, article, or site you probably wouldn't have searched for.</p>
+  </header>
+
+  <div class="layout">
+    <section class="controls" aria-label="Controls">
+      <div class="field">
+        <label class="lbl" for="topic">Field or topic</label>
+        <input id="topic" type="text" autocomplete="off" placeholder="e.g. acoustic sensing">
+        <div id="anchors" class="hint" aria-live="polite"></div>
+      </div>
+
+      <div class="field">
+        <span class="lbl" id="drift-lbl">Drift</span>
+        <div class="dial" id="dial" role="radiogroup" aria-labelledby="drift-lbl">
+          <svg viewBox="0 0 280 200" aria-hidden="true">
+            <path class="arc" d="M96.16 147.84 A62 62 0 1 1 183.84 147.84"/>
+            <g id="ticks"></g>
+          </svg>
+          <div class="knob" id="knob" tabindex="0" role="slider" aria-label="Drift" aria-valuemin="0" aria-valuemax="3"><div class="cap" id="cap"></div></div>
+        </div>
+        <p class="drift-desc" id="drift-desc"></p>
+      </div>
+
+      <fieldset class="field">
+        <legend class="lbl">Sources</legend>
+        <div id="sources"></div>
+      </fieldset>
+
+      <button class="draw" id="draw" type="button">Draw a find</button>
+      <p class="status" id="status" role="status"></p>
+
+      <details>
+        <summary>Settings</summary>
+        <p class="hint">Every source is queried directly from your browser. OpenAlex limits anonymous use; if draws start failing with HTTP 429, add a free OpenAlex API key or your email below.</p>
+        <div class="field">
+          <label class="lbl" for="oa-key">OpenAlex API key (optional)</label>
+          <input id="oa-key" type="password" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="lbl" for="oa-mail">Contact email for OpenAlex and Crossref (optional)</label>
+          <input id="oa-mail" type="email" autocomplete="email">
+        </div>
+      </details>
+    </section>
+
+    <section aria-label="Result">
+      <div class="result" id="result" aria-live="polite"></div>
+      <div class="history" id="history" hidden>
+        <div class="history-head"><h3>Earlier draws</h3><button class="linkbtn" id="clear" type="button">Clear</button></div>
+        <ol id="history-list"></ol>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+(() => {
+  /* ---------- helpers ---------- */
+  const $ = s => document.querySelector(s);
+  const store = {
+    get(k, d){ try { const v = localStorage.getItem('tangent:' + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v){ try { localStorage.setItem('tangent:' + k, JSON.stringify(v)); } catch {} }
+  };
+  const rnd = n => Math.floor(Math.random() * n);
+  const pick = a => a[rnd(a.length)];
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rnd(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const seed = () => String(rnd(1e9));
+  const sid = s => String(s || '').split('/').pop();
+  const strip = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const clip = (s, n = 520) => { s = s || ''; if (s.length <= n) return s; const i = s.lastIndexOf(' ', n); return s.slice(0, i > n * 0.6 ? i : n) + '…'; };
+  const safeUrl = u => (typeof u === 'string' && /^https?:\/\//i.test(u)) ? u : null;
+  function h(tag, attrs, ...kids){
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (v == null || v === false) continue;
+      if (k === 'class') el.className = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else el.setAttribute(k, v);
+    }
+    for (const c of kids.flat()) if (c != null && c !== '') el.append(c instanceof Node ? c : String(c));
+    return el;
+  }
+
+  async function getJSON(url, ms = 15000){
+    let t;
+    const timeout = new Promise((_, rej) => { t = setTimeout(() => rej(new Error('timed out')), ms); });
+    try {
+      const work = (async () => {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const txt = await r.text();
+        try { return JSON.parse(txt); } catch { throw new Error('unexpected reply'); }
+      })();
+      return await Promise.race([work, timeout]);
+    } catch (e) {
+      if (e instanceof TypeError && /fetch/i.test(e.message)) throw new Error('blocked or offline');
+      throw e;
+    } finally { clearTimeout(t); }
+  }
+
+  /* ---------- state ---------- */
+  const DRIFT = [
+    { name: 'Close',     angle: -135, desc: 'Stays on your anchor topic, drawn from anywhere in its literature.' },
+    { name: 'Adjacent',  angle: -45,  desc: 'Steps sideways to a sibling topic in the same subfield.' },
+    { name: 'Wandering', angle: 45,   desc: 'Roams to a different subfield within the same field.' },
+    { name: 'Far',       angle: 135,  desc: 'Leaps to a different field in the same broad domain of science.' }
+  ];
+  const SOURCES = {
+    openalex:  { label: 'Research papers',          via: 'OpenAlex',    fn: fromOpenAlex },
+    crossref:  { label: 'Journals and proceedings', via: 'Crossref',    fn: fromCrossref },
+    wikipedia: { label: 'Encyclopedia',             via: 'Wikipedia',   fn: fromWikipedia },
+    hn:        { label: 'Websites and discussion',  via: 'Hacker News', fn: fromHN },
+    gdelt:     { label: 'News',                     via: 'GDELT',       fn: fromGDELT }
+  };
+  const state = {
+    drift: store.get('drift', 1),
+    enabled: store.get('enabled', Object.keys(SOURCES)),
+    settings: store.get('settings', { key: '', mail: '' }),
+    history: store.get('history', []),
+    anchors: [], anchorIdx: 0, anchorQuery: null
+  };
+  let lookupToken = 0, drawing = false;
+
+  function oa(path, params){
+    const u = new URL('https://api.openalex.org' + path);
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    if (state.settings.key) u.searchParams.set('api_key', state.settings.key);
+    if (state.settings.mail) u.searchParams.set('mailto', state.settings.mail);
+    return u.toString();
+  }
+
+  /* ---------- topic anchoring and drift ---------- */
+  async function lookupTopics(q){
+    const token = ++lookupToken;
+    renderAnchors('loading');
+    try {
+      const d = await getJSON(oa('/topics', { search: q, per_page: 6 }));
+      if (token !== lookupToken) return;
+      state.anchors = d.results || []; state.anchorIdx = 0; state.anchorQuery = q;
+      renderAnchors();
+    } catch (e) {
+      if (token !== lookupToken) return;
+      state.anchors = []; state.anchorQuery = null;
+      renderAnchors('error', e.message);
+    }
+  }
+
+  async function driftFrom(a, lvl){
+    if (lvl === 0) return a;
+    const sub = sid(a.subfield?.id), fld = sid(a.field?.id), dom = sid(a.domain?.id);
+    const filter = lvl === 1 ? `subfield.id:${sub}`
+                 : lvl === 2 ? `field.id:${fld},subfield.id:!${sub}`
+                 :             `domain.id:${dom},field.id:!${fld}`;
+    const d = await getJSON(oa('/topics', { filter, sample: 8, seed: seed(), per_page: 8 }));
+    const c = (d.results || []).filter(t => t.id !== a.id);
+    return c.length ? pick(c) : a;
+  }
+
+  function keywordFor(topic, q, lvl){
+    if (!topic) return q;
+    if (lvl === 0 && Math.random() < 0.5) return q;
+    const kws = (topic.keywords || []).filter(k => typeof k === 'string' && k.length > 3);
+    return kws.length ? pick(kws) : topic.display_name;
+  }
+
+  /* ---------- sources ---------- */
+  const TYPE = { article: 'Paper', preprint: 'Preprint', 'book-chapter': 'Book chapter', dissertation: 'Dissertation', review: 'Review', report: 'Report', dataset: 'Dataset', book: 'Book', standard: 'Standard',
+                 'journal-article': 'Journal article', 'proceedings-article': 'Conference paper', 'posted-content': 'Preprint' };
+  const typeLabel = t => TYPE[t] || (t ? t.charAt(0).toUpperCase() + t.slice(1).replace(/-/g, ' ') : 'Paper');
+  const authorLine = a => !a.length ? null : a.length === 1 ? a[0] : a.length === 2 ? `${a[0]} and ${a[1]}` : `${a[0]} and ${a.length - 1} others`;
+  function invAbs(ii){
+    if (!ii) return '';
+    const w = [];
+    for (const [word, pos] of Object.entries(ii)) for (const p of pos) w[p] = word;
+    return w.filter(Boolean).join(' ');
+  }
+
+  async function fromOpenAlex({ topic, q }){
+    const p = { sample: 25, seed: seed(), per_page: 25,
+      select: 'id,doi,display_name,publication_year,type,primary_location,authorships,abstract_inverted_index,open_access' };
+    if (topic) p.filter = `topics.id:${sid(topic.id)}`; else p.search = q;
+    const d = await getJSON(oa('/works', p));
+    const r = (d.results || []).filter(w => w.display_name);
+    if (!r.length) return null;
+    const withAbs = r.filter(w => w.abstract_inverted_index);
+    const w = pick(withAbs.length && Math.random() < 0.8 ? withAbs : r);
+    const authors = (w.authorships || []).map(a => a.author?.display_name).filter(Boolean);
+    return {
+      title: strip(w.display_name),
+      url: safeUrl(w.open_access?.oa_url) || safeUrl(w.doi) || safeUrl(w.primary_location?.landing_page_url) || safeUrl(w.id),
+      kind: typeLabel(w.type),
+      meta: [w.primary_location?.source?.display_name, w.publication_year, authorLine(authors)],
+      snippet: clip(invAbs(w.abstract_inverted_index))
+    };
+  }
+
+  async function fromCrossref({ kw }){
+    const u = new URL('https://api.crossref.org/works');
+    u.searchParams.set('query.bibliographic', kw);
+    u.searchParams.set('rows', '30');
+    u.searchParams.set('offset', String(rnd(30)));
+    u.searchParams.set('select', 'DOI,title,container-title,issued,type,author,abstract,URL');
+    if (state.settings.mail) u.searchParams.set('mailto', state.settings.mail);
+    const d = await getJSON(u.toString());
+    const items = (d.message?.items || []).filter(i => i.title && i.title[0]);
+    if (!items.length) return null;
+    const i = pick(items);
+    const authors = (i.author || []).map(a => [a.given, a.family].filter(Boolean).join(' ')).filter(Boolean);
+    return {
+      title: strip(i.title[0]),
+      url: safeUrl(i.URL) || (i.DOI ? 'https://doi.org/' + i.DOI : null),
+      kind: typeLabel(i.type),
+      meta: [i['container-title']?.[0], i.issued?.['date-parts']?.[0]?.[0], authorLine(authors)],
+      snippet: clip(strip(i.abstract).replace(/^Abstract\s*/i, ''))
+    };
+  }
+
+  async function fromWikipedia({ kw }){
+    const u = 'https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=0&gsrlimit=20'
+      + '&prop=extracts|info&exintro=1&explaintext=1&exsentences=4&exlimit=20&inprop=url&gsrsearch=' + encodeURIComponent(kw);
+    const d = await getJSON(u);
+    const pages = Object.values(d.query?.pages || {}).filter(p => p.extract && !/may refer to/i.test(p.extract));
+    if (!pages.length) return null;
+    const p = pick(pages);
+    return { title: p.title, url: safeUrl(p.fullurl), kind: 'Encyclopedia article', meta: ['Wikipedia'], snippet: clip(p.extract) };
+  }
+
+  async function fromHN({ kw }){
+    const d = await getJSON('https://hn.algolia.com/api/v1/search?tags=story&hitsPerPage=50&query=' + encodeURIComponent(kw));
+    const hits = (d.hits || []).filter(x => safeUrl(x.url) && x.title);
+    if (!hits.length) return null;
+    const x = pick(hits);
+    let host = ''; try { host = new URL(x.url).hostname.replace(/^www\./, ''); } catch {}
+    return {
+      title: x.title, url: x.url, kind: 'Web page',
+      meta: [host, x.created_at ? x.created_at.slice(0, 4) : null, x.points != null ? `${x.points} points on Hacker News` : null],
+      snippet: clip(strip(x.story_text)),
+      extra: { label: 'Open the discussion', url: 'https://news.ycombinator.com/item?id=' + x.objectID }
+    };
+  }
+
+  async function fromGDELT({ kw }){
+    const clean = kw.replace(/["()]/g, ' ').trim();
+    if (clean.length < 4) return null;
+    const q = (/\s/.test(clean) ? `"${clean}"` : clean) + ' sourcelang:english';
+    const d = await getJSON('https://api.gdeltproject.org/api/v2/doc/doc?mode=artlist&format=json&maxrecords=75&timespan=3months&query=' + encodeURIComponent(q));
+    const arts = (d.articles || []).filter(x => safeUrl(x.url) && x.title);
+    if (!arts.length) return null;
+    const x = pick(arts);
+    const sd = x.seendate || '';
+    const date = sd.length >= 8 ? new Date(`${sd.slice(0,4)}-${sd.slice(4,6)}-${sd.slice(6,8)}T00:00:00Z`).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }) : null;
+    return { title: x.title, url: x.url, kind: 'News article', meta: [x.domain, date], snippet: '' };
+  }
+
+  /* ---------- draw ---------- */
+  async function draw(){
+    if (drawing) return;
+    const q = $('#topic').value.trim();
+    if (!q) { setStatus('Type a field or topic first.'); $('#topic').focus(); return; }
+    const enabled = state.enabled.filter(k => SOURCES[k]);
+    if (!enabled.length) { setStatus('Turn on at least one source.'); return; }
+    drawing = true; setBusy(true);
+    try {
+      if (q !== state.anchorQuery) { setStatus('Matching your topic…'); await lookupTopics(q); }
+      const anchor = state.anchors[state.anchorIdx] || null;
+      const lvl = anchor ? state.drift : 0;
+      const steps = [{ k: 'Your topic', v: q }];
+      let topic = anchor;
+      if (anchor) {
+        steps.push({ k: 'Anchor topic', v: anchor.display_name, s: anchor.subfield?.display_name });
+        if (lvl > 0) {
+          setStatus('Drifting…');
+          try { topic = await driftFrom(anchor, lvl); } catch { topic = anchor; }
+          if (topic !== anchor) steps.push({ k: `Drifted ${DRIFT[lvl].name.toLowerCase()}`, v: topic.display_name, s: lvl >= 2 ? `${topic.subfield?.display_name}, ${topic.field?.display_name}` : topic.subfield?.display_name });
+          else steps.push({ k: 'Drift', v: 'No neighbor found, stayed put' });
+        }
+      }
+      const errors = [];
+      for (const key of shuffle(enabled)) {
+        const src = SOURCES[key];
+        const kw = keywordFor(topic, q, lvl);
+        setStatus(`Asking ${src.via}…`);
+        try {
+          const res = await src.fn({ topic, q, kw });
+          if (res && res.url) {
+            const st = steps.slice();
+            if (key === 'openalex') st.push({ k: 'Filter', v: topic ? `Tagged ${topic.display_name}` : `Search for ${q}` });
+            else st.push({ k: 'Search term', v: kw });
+            st.push({ k: 'Source', v: src.via });
+            res.source = src.via; res.steps = st;
+            showResult(res); addHistory(res); setStatus('');
+            return;
+          }
+          errors.push(`${src.via}: nothing matched “${key === 'openalex' ? (topic ? topic.display_name : q) : kw}”`);
+        } catch (e) { errors.push(`${src.via}: ${e.message}`); }
+      }
+      showErrors(errors); setStatus('');
+    } finally { drawing = false; setBusy(false); }
+  }
+
+  /* ---------- rendering ---------- */
+  function setStatus(t){ $('#status').textContent = t; }
+  function setBusy(b){ const btn = $('#draw'); btn.disabled = b; btn.textContent = b ? 'Drawing…' : 'Draw a find'; }
+
+  function renderAnchors(mode, msg){
+    const box = $('#anchors'); box.replaceChildren();
+    if (mode === 'loading') { box.append('Finding matching topics…'); return; }
+    if (mode === 'error') { box.append(`Couldn't match topics (${msg}). Draws will search by your words only, so drift is off.`); return; }
+    if (state.anchorQuery === null) return;
+    if (!state.anchors.length) { box.append('No matching research topics. Draws will search by your words only, so drift is off.'); return; }
+    box.append(h('span', { style: 'display:block;margin-bottom:.4rem' }, 'Anchor topic (drift starts here):'));
+    const chips = h('div', { class: 'chips' });
+    state.anchors.forEach((t, i) => chips.append(h('button', {
+      class: 'chip', type: 'button', 'aria-pressed': String(i === state.anchorIdx),
+      title: [t.subfield?.display_name, t.field?.display_name].filter(Boolean).join(', '),
+      onclick: () => { state.anchorIdx = i; renderAnchors(); }
+    }, t.display_name)));
+    box.append(chips);
+  }
+
+  function renderEmpty(){
+    const ex = ['acoustic sensing', 'low-noise amplifiers', 'piezoelectric materials', 'haptic interfaces', 'antenna design', 'bioacoustics'];
+    $('#result').replaceChildren(h('div', { class: 'empty' },
+      h('h2', {}, 'Nothing drawn yet'),
+      h('p', {}, 'Close keeps results on your topic. Turn the dial toward Far and each draw starts from a neighboring corner of science instead. Try one of these:'),
+      h('div', { class: 'chips' }, ex.map(t => h('button', { class: 'chip', type: 'button', onclick: () => { $('#topic').value = t; draw(); } }, t)))
+    ));
+  }
+
+  function showResult(r){
+    const path = h('ol', { class: 'path', 'aria-label': 'How this find was reached' },
+      r.steps.map(s => h('li', {}, h('span', { class: 'k' }, s.k), h('span', { class: 'v' }, s.v), s.s ? h('span', { class: 's' }, s.s) : null)));
+    const meta = r.meta.filter(Boolean).map(m => h('span', {}, String(m)));
+    const card = h('article', { class: 'card' },
+      h('p', { class: 'kind' }, r.kind),
+      h('h2', {}, h('a', { href: r.url, target: '_blank', rel: 'noopener noreferrer' }, r.title)),
+      meta.length ? h('div', { class: 'meta' }, meta) : null,
+      r.snippet ? h('p', { class: 'snippet' }, r.snippet) : null,
+      h('div', { class: 'actions' },
+        h('a', { class: 'btn primary', href: r.url, target: '_blank', rel: 'noopener noreferrer' }, 'Open'),
+        r.extra && safeUrl(r.extra.url) ? h('a', { class: 'btn', href: r.extra.url, target: '_blank', rel: 'noopener noreferrer' }, r.extra.label) : null,
+        h('button', { class: 'btn', type: 'button', onclick: draw }, 'Draw another'))
+    );
+    $('#result').replaceChildren(path, card);
+    if (window.matchMedia('(max-width: 899px)').matches) $('#result').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  }
+
+  function showErrors(errs){
+    $('#result').replaceChildren(h('div', { class: 'errors' },
+      h('h2', {}, 'No find this time'),
+      h('p', {}, 'Every enabled source came back empty or unreachable. Try another draw, a broader topic, or a lower drift setting.'),
+      h('ul', {}, errs.map(e => h('li', {}, e)))
+    ));
+  }
+
+  function addHistory(r){
+    state.history.unshift({ title: r.title, url: r.url, source: r.source, kind: r.kind });
+    state.history = state.history.slice(0, 30);
+    store.set('history', state.history);
+    renderHistory(1);
+  }
+  function renderHistory(skip = 0){
+    const items = state.history.slice(skip);
+    $('#history').hidden = !items.length;
+    $('#history-list').replaceChildren(...items.map(x => h('li', {},
+      h('a', { href: safeUrl(x.url) || '#', target: '_blank', rel: 'noopener noreferrer' }, x.title),
+      h('span', {}, `${x.kind}, ${x.source}`))));
+  }
+
+  /* ---------- drift dial ---------- */
+  function buildDial(){
+    const cx = 140, cy = 104, ticks = $('#ticks'), NS = 'http://www.w3.org/2000/svg';
+    DRIFT.forEach((d, i) => {
+      const a = d.angle * Math.PI / 180, s = Math.sin(a), c = Math.cos(a);
+      const ln = document.createElementNS(NS, 'line');
+      ln.setAttribute('x1', cx + s * 56); ln.setAttribute('y1', cy - c * 56);
+      ln.setAttribute('x2', cx + s * 70); ln.setAttribute('y2', cy - c * 70);
+      ln.setAttribute('class', 'tick'); ln.dataset.i = i; ticks.append(ln);
+      const b = h('button', { class: 'stop', type: 'button', role: 'radio', tabindex: '-1', 'data-i': i,
+        style: `left:${cx + s * 108}px;top:${cy - c * 80}px`, onclick: () => setDrift(i) }, d.name);
+      $('#dial').append(b);
+    });
+    const knob = $('#knob');
+    let dragging = false, moved = false;
+    const fromPointer = e => {
+      const r = knob.getBoundingClientRect();
+      const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+      const ang = Math.atan2(dx, -dy) * 180 / Math.PI;
+      let best = 0, bd = 1e9;
+      DRIFT.forEach((d, i) => { const dd = Math.abs(d.angle - ang); if (dd < bd) { bd = dd; best = i; } });
+      return best;
+    };
+    knob.addEventListener('pointerdown', e => { dragging = true; moved = false; knob.setPointerCapture(e.pointerId); });
+    knob.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const r = knob.getBoundingClientRect();
+      if (Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)) < 14) return;
+      moved = true; const i = fromPointer(e); if (i !== state.drift) setDrift(i);
+    });
+    const end = () => { if (dragging && !moved) setDrift((state.drift + 1) % DRIFT.length); dragging = false; };
+    knob.addEventListener('pointerup', end);
+    knob.addEventListener('pointercancel', () => { dragging = false; });
+    knob.addEventListener('keydown', e => {
+      const k = e.key; let v = state.drift;
+      if (k === 'ArrowRight' || k === 'ArrowUp') v = Math.min(3, v + 1);
+      else if (k === 'ArrowLeft' || k === 'ArrowDown') v = Math.max(0, v - 1);
+      else if (k === 'Home') v = 0; else if (k === 'End') v = 3; else return;
+      e.preventDefault(); setDrift(v);
+    });
+  }
+  function setDrift(i){
+    state.drift = i; store.set('drift', i);
+    const d = DRIFT[i];
+    $('#cap').style.transform = `rotate(${d.angle}deg)`;
+    const knob = $('#knob');
+    knob.setAttribute('aria-valuenow', i); knob.setAttribute('aria-valuetext', d.name);
+    document.querySelectorAll('.tick').forEach(t => t.classList.toggle('on', +t.dataset.i === i));
+    document.querySelectorAll('.stop').forEach(b => b.setAttribute('aria-checked', String(+b.dataset.i === i)));
+    $('#drift-desc').textContent = d.desc;
+  }
+
+  /* ---------- sources and settings ---------- */
+  function buildSources(){
+    const box = $('#sources');
+    for (const [k, s] of Object.entries(SOURCES)) {
+      const cb = h('input', { type: 'checkbox', id: 'src-' + k });
+      cb.checked = state.enabled.includes(k);
+      cb.addEventListener('change', () => {
+        state.enabled = Object.keys(SOURCES).filter(x => $('#src-' + x).checked);
+        store.set('enabled', state.enabled);
+      });
+      box.append(h('label', { class: 'src', for: 'src-' + k }, cb, h('span', {}, s.label, ' ', h('small', {}, `via ${s.via}`))));
+    }
+  }
+  function buildSettings(){
+    const key = $('#oa-key'), mail = $('#oa-mail');
+    key.value = state.settings.key || ''; mail.value = state.settings.mail || '';
+    const save = () => { state.settings = { key: key.value.trim(), mail: mail.value.trim() }; store.set('settings', state.settings); };
+    key.addEventListener('change', save); mail.addEventListener('change', save);
+  }
+
+  /* ---------- init ---------- */
+  const input = $('#topic');
+  let deb;
+  input.addEventListener('input', () => {
+    clearTimeout(deb);
+    const q = input.value.trim();
+    if (!q) { state.anchors = []; state.anchorQuery = null; lookupToken++; renderAnchors(); return; }
+    deb = setTimeout(() => { if (q !== state.anchorQuery) lookupTopics(q); }, 600);
+  });
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { clearTimeout(deb); draw(); } });
+  $('#draw').addEventListener('click', draw);
+  $('#clear').addEventListener('click', () => { state.history = []; store.set('history', []); renderHistory(); });
+
+  buildDial(); setDrift(Math.min(3, Math.max(0, +state.drift || 0)));
+  buildSources(); buildSettings(); renderEmpty(); renderHistory();
+})();
+</script>
+</body>
+</html>
